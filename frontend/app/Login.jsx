@@ -1,6 +1,7 @@
 import { View, Text, TextInput, Pressable, Alert } from 'react-native';
 import React, {useState} from 'react';
 import { useRouter } from 'expo-router';
+import { IP_address } from '@env';
 
 const Login = () => {
     const [email, setEmail] = useState('');
@@ -8,7 +9,7 @@ const Login = () => {
     const router = useRouter();
     const handleSubmit = async () => {
         try {
-            const response = await fetch('http://localhost:8000/api/login/', {
+            const response = await fetch(`http://${IP_address}:8000/api/login/`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

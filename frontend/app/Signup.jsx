@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, TextInput, Pressable, Alert } from 'react-native';
 import React, { useState } from 'react';
-import {router, useNavigation} from 'expo-router';
 import {useRouter} from "expo-router";
+import {IP_address} from '@env';
 
 const Signup = () => {
     const [email, setEmail] = useState('');
@@ -9,11 +9,11 @@ const Signup = () => {
     const [username, setUsername] = useState('');
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
-    const navigation = useNavigation();
+    const router = useRouter();
 
     const handleSubmit = async () => {
         try {
-            const response = await fetch('http://localhost:8000/api/signup/', {
+            const response = await fetch(`http://${IP_address}:8000/api/signup/`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
