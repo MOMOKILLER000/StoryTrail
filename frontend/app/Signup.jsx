@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { IP_address } from '@env';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Entypo from "@expo/vector-icons/Entypo";
 
 const Signup = () => {
     const [email, setEmail] = useState('');
@@ -11,7 +12,7 @@ const Signup = () => {
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
     const {width, height} = Dimensions.get('window');
-
+    const [secureTextEntry, setSecureTextEntry] = useState(true);
     const [emailError, setEmailError] = useState(false);
     const [passwordError, setPasswordError] = useState(false);
     const [passwordLengthError, setPasswordLengthError] = useState(false);
@@ -112,12 +113,15 @@ const Signup = () => {
                     }}
                 />
                 {emailError && <Text className="text-red-600 mb-2 text-sm font-semibold">Email is required</Text>}
-
+                <View className="relative mb-[5%]">
                 <TextInput
-                    className={`w-full border rounded-xl px-4 py-4 mb-2 text-xl bg-white ${passwordError || passwordLengthError ? 'border-red-500' : 'border-gray-400'}`}
+                    className={`w-full border rounded-xl pr-12 pl-4 py-4 text-xl bg-white ${
+                        passwordError || passwordLengthError ? 'border-red-500' : 'border-gray-400'
+                    }`}
                     placeholder="Password"
                     placeholderTextColor="#666"
-                    secureTextEntry
+                    secureTextEntry={secureTextEntry}
+                    autoCapitalize="none"
                     value={password}
                     onChangeText={text => {
                         if ((passwordError && text.trim()) || (passwordLengthError && text.trim().length >= 8)) {
@@ -127,6 +131,17 @@ const Signup = () => {
                         setPassword(text);
                     }}
                 />
+                <Pressable style={{
+                    position: 'absolute',
+                    right: 16,
+                    top: '50%',
+                    transform: [{ translateY: -12 }],
+                }}
+                           onPress={()=>{setSecureTextEntry(!secureTextEntry)}}
+                >
+                    {secureTextEntry ? (<Entypo name="eye" size={24} color="black" />) : (<Entypo name="eye-with-line" size={24} color="black" />)}
+                </Pressable>
+                </View>
                 {passwordError && <Text className="text-red-600 mb-2 text-sm font-semibold">Password is required</Text>}
                 {passwordLengthError && <Text className="text-red-600 mb-2 text-sm font-semibold">Password must be at least 8 characters</Text>}
 
