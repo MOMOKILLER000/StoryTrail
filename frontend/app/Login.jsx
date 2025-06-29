@@ -57,7 +57,8 @@ const Login = () => {
             });
             const data = await response.json();
             if (response.ok) {
-                await AsyncStorage.setItem('token', data.token);
+                await AsyncStorage.setItem('access', data.access);
+                await AsyncStorage.setItem('refresh', data.refresh);
                 router.replace('/Home');
             } else {
                 Alert.alert('Login Failed', JSON.stringify(data));

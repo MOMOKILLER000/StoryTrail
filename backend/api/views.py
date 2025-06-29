@@ -2,12 +2,14 @@ import jwt
 import datetime
 from django.conf import settings
 from rest_framework.parsers import JSONParser
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-
-from .serializers import LoginSerializer, SignupSerializer
-
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from django.utils import timezone
+from .serializers import LoginSerializer, SignupSerializer, ProfileSerializer
+from rest_framework_simplejwt.tokens import RefreshToken
 
 class LoginView(APIView):
     parser_classes = [JSONParser]
@@ -19,17 +21,12 @@ class LoginView(APIView):
         if serializer.is_valid(raise_exception=True):
             user = serializer.validated_data['user']
 
-            payload = {
-                'user_id': user.id,
-                'email': user.email,
-                'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=24),
-                'iat': datetime.datetime.utcnow(),
-            }
-
-            token = jwt.encode(payload, settings.SECRET_KEY, algorithm='HS256')
+            refresh = RefreshToken.for_user(user)
+            access_token = str(refresh.access_token)
 
             return Response({
-                'token': token,
+                'refresh': str(refresh),
+                'access': access_token,
             })
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -45,18 +42,12 @@ class SignupView(APIView):
         if serializer.is_valid(raise_exception=True):
             user = serializer.save()
 
-            # Create JWT token after signup
-            payload = {
-                'user_id': user.id,
-                'email': user.email,
-                'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=24),
-                'iat': datetime.datetime.utcnow(),
-            }
-
-            token = jwt.encode(payload, settings.SECRET_KEY, algorithm='HS256')
+            refresh = RefreshToken.for_user(user)
+            access_token = str(refresh.access_token)
 
             return Response({
-                'token': token,
+                'refresh': str(refresh),
+                'access': access_token,
                 'user': {
                     'id': user.id,
                     'email': user.email,
@@ -66,4 +57,23 @@ class SignupView(APIView):
                 }
             }, status=status.HTTP_201_CREATED)
 
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class ProfileView(APIView):
+    parser_classes = [JSONParser]
+    permission_classes = [IsAuthenticated]
+    # Use your authentication class here; for JWT:
+    authentication_classes = [JWTAuthentication]  # Replace with your JWTAuthentication if set up
+
+
+    def get(self, request):
+        serializer = ProfileSerializer(request.user)
+        return Response(serializer.data)
+
+
+    def put(self, request):
+        serializer = ProfileSerializer(request.user, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
