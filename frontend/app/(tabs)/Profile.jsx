@@ -21,6 +21,7 @@ import { IP_address } from '@env';
 import AntDesign from '@expo/vector-icons/AntDesign';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useRouter } from 'expo-router';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const { width } = Dimensions.get('window');
 
@@ -48,17 +49,46 @@ export default function Profile() {
     const [responseMessage, setResponseMessage] = useState('');
 
     useEffect(() => {
-        fetch(`http://${IP_address}:8000/api/profile/`)
-            .then((res) => res.json())
-            .then(setUser)
-            .catch(console.log);
+        const fetchProfile = async () => {
+            try {
+                const token = await AsyncStorage.getItem('access');
+                console.log("The token is: ", token);
+                const res = await fetch(`http://${IP_address}:8000/api/profile/`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token}`,
+                    },
+                });
+
+                if (!res.ok) {
+                    console.log('Failed to fetch profile:', res.status);
+                    return;
+                }
+
+                const data = await res.json();
+                setUser({
+                    first_name: data.first_name || '',
+                    last_name: data.last_name || '',
+                    username: data.username || '',
+                });
+            } catch (error) {
+                console.log('Error fetching profile:', error);
+            }
+        };
+
+        fetchProfile();
     }, []);
 
     const handleSave = async () => {
         try {
+            const token = await AsyncStorage.getItem('access');
             const res = await fetch(`http://${IP_address}:8000/api/profile/`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
                 body: JSON.stringify(user),
             });
             setResponseMessage(res.ok ? 'Your data has been successfully saved.' : 'Something went wrong. Try again.');
