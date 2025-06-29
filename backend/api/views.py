@@ -1,7 +1,7 @@
 import jwt
 import datetime
 from django.conf import settings
-from rest_framework.parsers import JSONParser
+from rest_framework.parsers import JSONParser, FormParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -10,6 +10,7 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from django.utils import timezone
 from .serializers import LoginSerializer, SignupSerializer, ProfileSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.parsers import MultiPartParser
 
 class LoginView(APIView):
     parser_classes = [JSONParser]
@@ -60,20 +61,35 @@ class SignupView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class ProfileView(APIView):
-    parser_classes = [JSONParser]
+    # MultiPartParser handles multipart/form-data; FormParser handles urlencoded form data
+    parser_classes = [MultiPartParser, FormParser]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
-    # Use your authentication class here; for JWT:
-    authentication_classes = [JWTAuthentication]  # Replace with your JWTAuthentication if set up
-
 
     def get(self, request):
         serializer = ProfileSerializer(request.user)
         return Response(serializer.data)
 
+    def patch(self, request, *args, **kwargs):
+        """
+        Partial update: only fields present in request.data (and request.FILES)
+        will be changed on the user instance.
+        """
+        user = request.user
+        serializer = ProfileSerializer(user, data=request.data, partial=True)
 
-    def put(self, request):
-        serializer = ProfileSerializer(request.user, data=request.data)
+        # Debugging—remove or comment out in production
+        print("FILES:", request.FILES)
+        print("DATA:", request.data)
+
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def put(self, request, *args, **kwargs):
+        """
+        Full update fallback: behaves exactly like patch(), so you won't
+        accidentally wipe out the image when you omit it.
+        """
+        return self.patch(request, *args, **kwargs)
