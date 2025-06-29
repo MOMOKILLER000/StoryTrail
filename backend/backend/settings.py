@@ -1,6 +1,7 @@
 from pathlib import Path
 from dotenv import load_dotenv
 import os
+from datetime import timedelta
 
 load_dotenv()
 
@@ -9,6 +10,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-^c0^f$&(zkc_e=fq8#zh!al4@!#l-*uk1b@h3om)$@z0+tep)1'
 DEBUG = True
 ALLOWED_HOSTS = [os.getenv("IP_address"), 'localhost']
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=6),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+}
+
 
 INSTALLED_APPS = [
     'django.contrib.admin',
