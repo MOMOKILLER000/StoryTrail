@@ -45,7 +45,7 @@ export default function Profile() {
 
     const styles = getStyles(theme);
 
-    const [user, setUser] = useState({ username: 'test', first_name: 'test', last_name: 'test' });
+    const [user, setUser] = useState({ username: 'test', first_name: 'test', last_name: 'test', email: 'test@test.com' });
     const [responseMessage, setResponseMessage] = useState('');
 
     useEffect(() => {
@@ -71,6 +71,7 @@ export default function Profile() {
                     first_name: data.first_name || '',
                     last_name: data.last_name || '',
                     username: data.username || '',
+                    email: data.email || '',
                 });
             } catch (error) {
                 console.log('Error fetching profile:', error);
@@ -143,17 +144,20 @@ export default function Profile() {
                         {/* FORM */}
                         <View style={styles.inner}>
                             <Text style={[styles.title, { color: theme.text }]}>Edit Profile</Text>
-                            {['first_name', 'last_name', 'username'].map((field) => (
+                            {['first_name', 'last_name', 'username', 'email'].map((field) => (
                                 <View key={field} style={styles.inputGroup}>
                                     <Text style={[styles.label, { color: theme.text }]}>
-                                        {field === 'username'
-                                            ? 'Username'
-                                            : field === 'first_name'
-                                                ? 'First Name'
-                                                : 'Last Name'}
+                                        {field === 'first_name'
+                                            ? 'First Name'
+                                            : field === 'last_name'
+                                                ? 'Last Name'
+                                                : field === 'username'
+                                                    ? 'Username'
+                                                    : 'Email'}
                                     </Text>
                                     <TextInput
                                         value={user[field]}
+                                        editable={field !== 'email'}
                                         placeholder={
                                             field === 'username'
                                                 ? 'Username'
