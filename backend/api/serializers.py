@@ -40,7 +40,24 @@ class SignupSerializer(serializers.ModelSerializer):
         return user
 
 class ProfileSerializer(serializers.ModelSerializer):
+    # allow omitting the field entirely, or sending null explicitly
+    profile_picture = serializers.ImageField(required=False, allow_null=True)
+
     class Meta:
         model = User
-        fields = ['first_name', 'last_name', 'username', 'email']
+        fields = ['username', 'first_name', 'last_name', 'email', 'profile_picture']
         read_only_fields = ['email']
+
+    def update(self, instance, validated_data):
+        profile_picture = validated_data.pop('profile_picture', serializers.empty)
+
+        # update all other fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        if profile_picture is not serializers.empty and profile_picture is not None:
+            instance.profile_picture = profile_picture
+
+
+        instance.save()
+        return instance

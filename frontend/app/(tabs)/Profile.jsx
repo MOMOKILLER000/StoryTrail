@@ -21,7 +21,9 @@ import { IP_address } from '@env';
 import AntDesign from '@expo/vector-icons/AntDesign';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useRouter } from 'expo-router';
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Feather from '@expo/vector-icons/Feather';
+import * as ImagePicker from 'expo-image-picker';
 
 const { width } = Dimensions.get('window');
 
@@ -39,20 +41,28 @@ export default function Profile() {
             primary: isDark ? '#0f766e' : '#20786e',
             messageBg: isDark ? '#0f766e' : '#20786e',
             statusBarStyle: isDark ? 'light-content' : 'dark-content',
+            editButton: isDark ? '#ffffff' : '#121212',
         }),
         [isDark]
     );
 
     const styles = getStyles(theme);
 
-    const [user, setUser] = useState({ username: 'test', first_name: 'test', last_name: 'test', email: 'test@test.com' });
+    const [user, setUser] = useState({
+        username: '',
+        first_name: '',
+        last_name: '',
+        email: '',
+        profile_picture: '',
+    });
+    const [localImageFile, setLocalImageFile] = useState(null);
     const [responseMessage, setResponseMessage] = useState('');
 
+    // Fetch profile on mount
     useEffect(() => {
         const fetchProfile = async () => {
             try {
                 const token = await AsyncStorage.getItem('access');
-                console.log("The token is: ", token);
                 const res = await fetch(`http://${IP_address}:8000/api/profile/`, {
                     method: 'GET',
                     headers: {
@@ -68,10 +78,11 @@ export default function Profile() {
 
                 const data = await res.json();
                 setUser({
+                    username: data.username || '',
                     first_name: data.first_name || '',
                     last_name: data.last_name || '',
-                    username: data.username || '',
                     email: data.email || '',
+                    profile_picture: data.profile_picture || '',
                 });
             } catch (error) {
                 console.log('Error fetching profile:', error);
@@ -84,46 +95,141 @@ export default function Profile() {
     const handleSave = async () => {
         try {
             const token = await AsyncStorage.getItem('access');
+            const formData = new FormData();
+
+            formData.append('username', user.username);
+            formData.append('first_name', user.first_name);
+            formData.append('last_name', user.last_name);
+
+            // Native mobile or web file upload
+            if (Platform.OS === 'web') {
+                if (localImageFile instanceof File) {
+                    formData.append('profile_picture', localImageFile, localImageFile.name);
+                }
+            } else {
+                if (user.profile_picture && user.profile_picture.startsWith('file://')) {
+                    // Append only fresh local file URIs
+                    const uri = user.profile_picture;
+                    const filename = uri.split('/').pop();
+                    const match = /\.(\w+)$/.exec(filename);
+                    const ext = match ? match[1] : 'jpg';
+                    const mimeType = `image/${ext}`;
+                    formData.append('profile_picture', { uri, name: filename, type: mimeType });
+                }
+            }
+
+
             const res = await fetch(`http://${IP_address}:8000/api/profile/`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify(user),
+                method: 'PATCH',
+                headers: { Authorization: `Bearer ${token}` },
+                body: formData,
             });
-            setResponseMessage(res.ok ? 'Your data has been successfully saved.' : 'Something went wrong. Try again.');
+
+            if (!res.ok) {
+                console.log('Upload failed:', await res.text());
+                setResponseMessage('Something went wrong. Try again.');
+                return;
+            }
+
+            const data = await res.json();
+
+            setUser(prev => ({
+                ...prev,
+                profile_picture: data.profile_picture
+                    ? data.profile_picture + `?v=${Date.now()}`
+                    : prev.profile_picture,
+            }));
+            setLocalImageFile(null);
+            setResponseMessage('Your data has been successfully saved.');
         } catch (err) {
-            console.log(err);
+            console.log('Save error:', err);
+            setResponseMessage('Something went wrong. Try again.');
         }
     };
 
+    const openImagePicker = async () => {
+        if (Platform.OS === 'web') {
+            // Create file input dynamically
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.onchange = () => {
+                const file = input.files[0];
+                if (file) {
+                    const url = URL.createObjectURL(file);
+                    setUser(prev => ({ ...prev, profile_picture: url }));
+                    setLocalImageFile(file);
+                }
+            };
+            input.click();
+            return;
+        }
+
+        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) {
+            alert('Permission to access photos is required!');
+            return;
+        }
+
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 1,
+        });
+
+        if (!result.canceled) {
+            const uri = result.assets[0].uri;
+            setUser(prev => ({ ...prev, profile_picture: uri }));
+        }
+    };
+
+    const sourceUri = (() => {
+        if (localImageFile) {
+            // Web: use preview URL from the File
+            if (Platform.OS === 'web') {
+                return user.profile_picture; // Should be a blob URL already
+            }
+        }
+
+        if (user.profile_picture) {
+            if (
+                user.profile_picture.startsWith('http') ||     // Full URL
+                user.profile_picture.startsWith('file://') ||  // Local file (native)
+                user.profile_picture.startsWith('blob:')       // Blob URL (web preview)
+            ) {
+                return user.profile_picture;
+            }
+            // Backend relative path (e.g. "/media/profile_pictures/...")
+            return `http://${IP_address}:8000${user.profile_picture}`;
+        }
+
+        return null;
+    })();
+
     useEffect(() => {
         if (responseMessage) {
-            const timeout = setTimeout(() => setResponseMessage(''), 5000);
-            return () => clearTimeout(timeout);
+            const timer = setTimeout(() => setResponseMessage(''), 5000);
+            return () => clearTimeout(timer);
         }
     }, [responseMessage]);
 
-    const MainContent = (
+    return (
         <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
             <StatusBar barStyle={theme.statusBarStyle} backgroundColor={theme.background} />
             <KeyboardAvoidingView
                 style={styles.flex}
-                behavior={
-                    Platform.OS === 'ios' ? 'padding' :
-                        Platform.OS === 'android' ? 'height' :
-                            undefined
-                }
-                keyboardVerticalOffset={30}
+                behavior={Platform.select({ ios: 'padding', android: 'height' })}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 30}
             >
-                <View style={styles.flex}>
+                <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
                     <ScrollView
                         style={styles.scroll}
                         contentContainerStyle={styles.scrollContent}
                         keyboardShouldPersistTaps="handled"
+                        showsVerticalScrollIndicator={false}
+                        bounces={true}
                     >
-                        {/* HEADER */}
                         <ImageBackground
                             source={require('../../assets/images/profileBg.png')}
                             style={styles.header}
@@ -133,36 +239,32 @@ export default function Profile() {
                             </Pressable>
                         </ImageBackground>
 
-                        {/* PROFILE PIC */}
                         <View style={styles.pfpContainer}>
-                            <Image
-                                source={require('../../assets/images/testPfp.png')}
-                                style={styles.pfp}
-                            />
+                            {sourceUri ? (
+                                <Image source={{ uri: sourceUri }} style={styles.pfp} />
+                            ) : (
+                                <Image
+                                    source={require('../../assets/images/defaultProfile.png')}
+                                    style={styles.pfp}
+                                />
+                            )}
+
+                            <Pressable style={styles.editButton} onPress={openImagePicker}>
+                                <Feather name="edit-2" size={24} color={isDark ? 'black' : 'white'} />
+                            </Pressable>
                         </View>
 
-                        {/* FORM */}
                         <View style={styles.inner}>
                             <Text style={[styles.title, { color: theme.text }]}>Edit Profile</Text>
-                            {['first_name', 'last_name', 'username', 'email'].map((field) => (
+                            {['email', 'first_name', 'last_name', 'username'].map(field => (
                                 <View key={field} style={styles.inputGroup}>
                                     <Text style={[styles.label, { color: theme.text }]}>
-                                        {field === 'first_name'
-                                            ? 'First Name'
-                                            : field === 'last_name'
-                                                ? 'Last Name'
-                                                : field === 'username'
-                                                    ? 'Username'
-                                                    : 'Email'}
+                                        {field.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                                     </Text>
                                     <TextInput
                                         value={user[field]}
                                         editable={field !== 'email'}
-                                        placeholder={
-                                            field === 'username'
-                                                ? 'Username'
-                                                : field.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
-                                        }
+                                        placeholder={field.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                                         placeholderTextColor={isDark ? '#888888' : '#aaaaaa'}
                                         style={[
                                             styles.input,
@@ -172,10 +274,11 @@ export default function Profile() {
                                                 color: theme.text,
                                             },
                                         ]}
-                                        onChangeText={(text) => setUser((u) => ({ ...u, [field]: text }))}
+                                        onChangeText={text => setUser(u => ({ ...u, [field]: text }))}
                                     />
                                 </View>
                             ))}
+
                             <Pressable
                                 style={[styles.saveButton, { backgroundColor: theme.primary }]}
                                 onPress={handleSave}
@@ -183,31 +286,22 @@ export default function Profile() {
                                 <Text style={styles.saveButtonText}>Save Changes</Text>
                             </Pressable>
                         </View>
-                    </ScrollView>
 
-                    {/* FEEDBACK MESSAGE */}
-                    {responseMessage ? (
-                        <View style={[styles.message, { backgroundColor: theme.messageBg }]}>
-                            <Text style={styles.messageText}>{responseMessage}</Text>
-                            <AntDesign
-                                name="closecircle"
-                                size={20}
-                                color="white"
-                                onPress={() => setResponseMessage('')}
-                            />
-                        </View>
-                    ) : null}
-                </View>
+                        {responseMessage ? (
+                            <View style={[styles.message, { backgroundColor: theme.messageBg }]}>
+                                <Text style={styles.messageText}>{responseMessage}</Text>
+                                <AntDesign
+                                    name="closecircle"
+                                    size={20}
+                                    color="white"
+                                    onPress={() => setResponseMessage('')}
+                                />
+                            </View>
+                        ) : null}
+                    </ScrollView>
+                </TouchableWithoutFeedback>
             </KeyboardAvoidingView>
         </SafeAreaView>
-    );
-
-    return Platform.OS !== 'web' ? (
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-            {MainContent}
-        </TouchableWithoutFeedback>
-    ) : (
-        MainContent
     );
 }
 
@@ -309,5 +403,12 @@ function getStyles(theme) {
             flex: 1,
             marginRight: 12,
         },
+        editButton:{
+            padding: 4,
+            backgroundColor: theme.editButton,
+            borderRadius: 30,
+            top: -25,
+            left: 30,
+        }
     });
 }

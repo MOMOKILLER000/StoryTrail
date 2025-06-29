@@ -33,6 +33,10 @@ class User(AbstractUser,PermissionsMixin):
     username = models.CharField(max_length=255,unique=True)
     date_joined = models.DateTimeField(auto_now_add=True)
     last_login = models.DateTimeField(auto_now=True)
+    profile_picture = models.ImageField(upload_to='profile_pictures', blank=True, null=True)
     objects = CustomUserManager()
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['first_name', 'last_name']
+
+    def _str_(self):
+        return self.username
